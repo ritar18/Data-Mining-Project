@@ -1,0 +1,488 @@
+---
+editor_options:
+  markdown:
+    wrap: sentence
+output:
+  word_document: default
+  pdf_document: default
+---
+
+## Project Phase 1
+
+Mira Madi & Rita Rizkallah
+
+## 1-About Dataset
+
+This dataset can used to predict possibility or risk of getting other diseases.This includes the details of individuals having various disorders.Very useful for corona risk prediction.
+It has attributes like age, diabetes, cancer, etc.
+The dataset is from kaggle.
+Outcome: risk of getting another disease. (the possibility of comorbidities)
+
+## 2-Data Preprocessing
+
+Data preprocessing is important because it ensures that the data is clean and that we end up with the most accurate results possible.
+
+First, we set the working directory, read the dataset file and view it.
+
+```{r pressure, echo=FALSE}
+options(repos = c(CRAN = "https://cran.rstudio.com/"))
+install.packages("tinytex")
+tinytex::install_tinytex()
+
+df <- read.csv("Diseases.csv")
+View(df)
+```
+
+Then, we invoked the str function which provides a summary of the dataset, including its type, the number of observations, and variables (attributes).
+It also gives the type of each attribute.
+
+We also invoked the summary function which gives the "5-number summary", for our data it is only relevant for the age and bmi attributes, since the rest are qualitative attributes
+
+colnames(df) prints out the names of the columns which represent the attributes.
+
+```{r pressure1, echo=FALSE}
+str(df)
+summary(df)
+colnames(df)
+```
+
+In order to check for missing values, we first invoke the dim function which gives the number of observations and the number of attributes, then invoke the na.omit function which removes missing values and then we recheck using dim function, the result did not change meaning that we don't have any missing values.
+This ensures that our data is complete!
+
+```{r pressure2, echo=FALSE}
+dim(df)
+df <- na.omit(df)
+dim(df)
+```
+
+If duplicates are present, it is always better if they are removed, as they can introduce correlated error terms, which lead to the prediction intervals being narrower than they should be.
+So we invoked duplicated function which showed that we had 2 rows that are duplicated, to remove them we used !d
+uplicated function and saved the result to a new dataframe.
+
+```{r pressure3, echo=FALSE}
+df[duplicated(df), ]
+```
+
+```{r pressure4, echo=FALSE}
+df_unique <- df[!duplicated(df), ]
+df_unique[duplicated(df_unique), ]
+View(df_unique)
+```
+
+We suspect that there is a correlation between a high BMI and an increased risk of diabetes, thus we created a subset of data taking BMI \> 25, and this showed that our doubts might be correct.
+
+```{r pressure5, echo=FALSE}
+subset_BMI <- subset(df_unique, BMI > 25)
+View(subset_BMI)
+```
+
+To check if we have logical values of age and BMI we ran the function unique.
+It showed the possible values for age and BMI that are present in our data and it seems that they are all within the normal range of logical values, thus we do not have any unexpected random values.
+
+```{r pressure6, echo=FALSE}
+unique(df_unique$Age)
+unique(df_unique$BMI)
+```
+
+## 3-Data Visualization
+
+```{r pressure7, echo=FALSE}
+library(tidyverse)
+
+df_unique_long <- df_unique %>%
+  pivot_longer(
+    cols = c(Diabetes, Cardio_Vascular_Diseases, Sickle_cell_diesases, Immuno_deficiency_disease, 
+             Down_syndrome, Cancer, Chronic_Respiratory_disease, Hypertension), 
+    names_to = "Condition", 
+    values_to = "Has_Condition"
+  )
+
+df_unique_long <- df_unique_long[df_unique_long$Has_Condition == 1, ]
+ggplot(df_unique_long, aes(x = Gender, fill = Condition)) +
+  geom_bar(position = "stack") +
+  labs(title = "Stacked Bar Graph of Chronic Conditions by Gender",
+       x = "Gender", y = "Count of Conditions") +
+  theme_minimal()
+```
+
+This stacked bar graph shows the different diseases' distributions between females and males.
+We see that there is a minor difference between females and males in general, as both have almost equal number of cases.
+
+```{r pressure8, echo=FALSE}
+ggplot(df_unique, aes(x = Gender, fill = factor(Cardio_Vascular_Diseases))) +
+  geom_bar(position = "dodge") +
+  labs(
+    title = "Grouped Bar Chart of Cardiovascular Disease by Gender",
+    x = "Gender",
+    y = "Count",
+    fill = "Cardio Vascular Disease"
+  ) +
+  scale_fill_manual(values = c("0" = "lightgray", "1" = "steelblue"),
+                    labels = c("No", "Yes")) +
+  theme_minimal()
+```
+
+This grouped bar chart shows count of presence and absence of CVD for Females and Males.
+It shows that more males have CVD vs females, this does not seem to be significant but further analysis such as statistical test are needed.
+
+```{r pressure9, echo=FALSE}
+ggplot(df_unique, aes(x = factor(Diabetes), y = BMI, fill = factor(Diabetes))) +
+  geom_boxplot(outlier.colour = "red", outlier.size = 2) +  # Optional: Highlight outliers
+  labs(
+    title = "Box Plot of BMI by Diabetes Status",
+    x = "Diabetes (0 = No, 1 = Yes)",
+    y = "BMI",
+    fill = "Diabetes"
+  ) +
+  scale_fill_manual(values = c("0" = "lightblue", "1" = "lightcoral")) +
+  theme_minimal()
+```
+
+This box plot shows the 5-number summary for Diabetes (present (1) or absent (0)) in function of BMI level.
+While the median BMI is slightly higher in individuals with diabetes, there is no significant difference in the overall distribution of BMI between the two groups.
+However, the presence of outliers suggests that some individuals with diabetes may have extreme BMI values.
+
+```{r pressure10, echo=FALSE}
+ggplot(data = df_unique, aes(x = Vaccinated)) +
+  geom_histogram(fill = "magenta", color = "black", bins = 3) +
+  labs(x = "Vaccinated", y = "Frequency") +
+  scale_x_continuous(breaks = c(0, 1)) +
+  theme_minimal()
+```
+
+The bar chart shows the frequency of individuals who are vaccinated (1) and not vaccinated (0).
+The height of each bar represents the number of individuals in each category.
+From the chart, it appears that there are more individuals who are vaccinated than not vaccinated.
+
+```{r pressure11, echo=FALSE}
+library(psych)
+library(corrplot)
+df_unique$Gender <- as.numeric(factor(df_unique$Gender))
+correlations <- corr.test(df_unique)
+corr_matrix <- correlations$r
+corrplot(corr_matrix, method = "color", type = "upper", order = "hclust", tl.col = "black", tl.srt = 45)
+```
+
+This correlation matrix shows all possible correlations and the level of correlation ranging from -1 (dark red) to 1 (dark blue).
+There seems to be some kind of correlation between all the different types of diseases with the outcome, being the risk of getting another disease.
+For example, there seems to be little correlation between cardiovascular diseases and the risk of getting another disease, while others like down sydrome and chronic respiratory disease have a higher correlation with the outcome.
+BMI has no correlation with the outcome, but age and gender do have a somewhat low correlation with it.
+Moreover there seems to be a positive correlation between cancer and sickle cell diseases as well as between Down syndrome and and immuno dificiency disease.These can be used as interaction terms when we generate our model.
+The matrix also shows a negative correlation between diabetes and sickle cell diseases, as well as cancer.
+All in all, there is a need to generate multiple linear regression models, including interaction terms.
+
+## 4- Model Selection
+
+## A- Best Subset Selection
+
+This approach identifies a subset of the predictors that are likely related to the response and then fits a model using least squares on that subset.
+This is computationally expensive because it involves evaluating all possible combinations of predictors.
+
+```{r pressure12, echo=FALSE}
+#install.packages("leaps")
+library (leaps)
+df_unique$Outcome <- as.factor(df_unique$Outcome)
+best_subset_model <- regsubsets(Outcome ~ ., data = df_unique, nvmax = ncol(df_unique) - 1)
+summary(best_subset_model)
+```
+
+The results from the best subset selection show that the model considers 12 variables, including Age, Gender, BMI, and various diseases.
+The algorithm, using an exhaustive search, evaluates combinations of these variables to identify subsets that best predict the outcome.
+
+The table indicates which variables are included (having most significant effect on outcome) in different model sizes.
+For example, as the number of variables increases, more variables like Vaccinated and Hypertension become included in the model.
+The final model suggests that variables like BMI, Diabetes, and Vaccinated are significant contributors to predicting the outcome.
+
+### Visualizing R-Squared in Best Subset Selection
+
+We utilize the ggvis package to generate a clear scatter plot that displays R-squared values from the best subset selection.
+The x-axis indicates the number of predictors, while the y-axis shows the R-squared values, with each point color-coded according to its R-squared value.
+As the number of the predictors increases, R squared still increases as expected.
+
+```{r pressure13, echo=FALSE}
+#install.packages("ggvis")
+library(ggvis)
+rsq <- as.data.frame(summary(best_subset_model)$rsq)
+names(rsq) <- "R2"
+rsq %>%
+ggvis(x=~ c(1:nrow(rsq)), y=~R2 ) %>%
+layer_points(fill = ~ R2 ) %>%
+add_axis("y", title = "R2") %>%
+add_axis("x", title = "Number of predictors")
+```
+
+### Visualizing Model Complexity Measures in Best Subset Selection
+
+We now visualize various model complexity measures in best subset selection.
+
+```{r pressure14, echo=FALSE}
+# plotting RSS
+par(mfrow=c(2,2))
+plot(summary(best_subset_model)$rss ,xlab="Number of Variables ",ylab="RSS",type="l")
+# Plotting adjusted R squared with red dot on max value
+plot(summary(best_subset_model)$adjr2 ,xlab="Number of Variables ", ylab="Adjusted RSq",type="l")
+points(which.max(summary(best_subset_model)$adjr2), summary(best_subset_model)$adjr2[11], col="red", cex=2,pch=20)
+# Plotting CP with red dot on minimal value
+plot(summary(best_subset_model)$cp ,xlab="Number of Variables ",ylab="Cp", type='l')
+points(which.min(summary(best_subset_model)$cp),summary(best_subset_model)$cp [10],col="red", cex=2,pch=20)
+# Plotting BIC
+plot(summary(best_subset_model)$bic ,xlab="Number of Variables ",ylab="BIC",type='l')
+```
+
+1- RSS vs. Number of Variables: As the number of predictors in increasing, the RSS is decreasing which shows that adding more predictors minimizes the RSS.
+Lowest RSS for the model with 11 predictors.
+2- Adjusted RSq vs. Number of Variables: Adjusted RSq takes into account the number of variables compares to RSq.
+The red dot highlights the maximum adjusted RSq value.
+The plot suggests that the best model includes 11 predictors (highest adjusted RSq).
+3- Mallow's Cp vs. Number of Varibales: Mellow's cp is a method for selecting the optimal complexity parameter in regression models to balance fit and simplicity, often using a combination of cross-validation and Bayesian principles.
+The red dot highlights the minimum Cp metric, the model with 11 predictors has the lowest Cp and so this metric also identifies the model with 11 predictors as the most suitable one.
+4- BIC vs. Number of Variables: BIC helps determine which model among a set of candidates best explains the data while penalizing complexity to avoid overfitting.
+We should aim for a model with a low BIC, as the number of our variables increaes the BIC decreases and we observe the lowest BIC for the model with 11 predictors, in accordance with previous metrics.
+
+All in all the 4 metrics showed that the best model was the one with 11 predictors.
+
+### Extracting Coefficients
+
+We now display the coefficients of the best subset model with 11 predictors.
+
+```{r pressure15, echo=FALSE}
+coef(best_subset_model ,11)
+```
+
+We can see that sickle cell disease has the most significant effect, it is the mostly correlated with getting another disease.
+
+## Forward Subset Selection
+
+We now perform forward subset selection which is a method that starts with an empty model and iteratively adds the most significant predictor variables one by one to improve the model performance until no further significant improvement can be made.
+
+```{r pressure16, echo=FALSE}
+subset.fwd = regsubsets (Outcome~., data=df_unique ,nvmax = ncol(df_unique) - 1, method ="forward")
+summary ( subset.fwd )
+```
+
+### Visualizing Model Complexity Measures in Forward Subset Selection
+
+We now visualize various model complexity measures in forward subset selection.
+
+```{r pressure17, echo=FALSE}
+#Plotting RSS
+par(mfrow=c(2,2))
+plot(summary(subset.fwd)$rss ,xlab="Number of Variables ",ylab="RSS",type="l")
+# Plotting adjusted R squared with red dot on max value
+plot(summary(subset.fwd)$adjr2 ,xlab="Number of Variables ", ylab="Adjusted RSq",type="l")
+points(which.max(summary(subset.fwd)$adjr2), summary(subset.fwd)$adjr2[11], col="blue", cex=
+2,pch=20)
+# Plotting CP with red dot on minimal value
+plot(summary(subset.fwd)$cp ,xlab="Number of Variables ",ylab="Cp", type='l')
+points(which.min(summary(subset.fwd)$cp),summary(subset.fwd)$cp [10],col="blue", cex=2,pch=20)
+# Plotting BIC
+plot(summary(subset.fwd)$bic ,xlab="Number of Variables ",ylab="BIC",type='l')
+```
+
+Similar results as for best subset selection.
+
+1- RSS vs. Number of Variables: As the number of predictors in increasing, the RSS is decreasing which shows that adding more predictors minimizes the RSS.
+Lowest RSS for the model with 11 predictors.
+2- Adjusted RSq vs. Number of Variables: The blue dot highlights the maximum adjusted RSq value.
+The plot suggests that the best model includes 11 predictors (highest adjusted RSq).
+3- Mallow's Cp vs. Number of Varibales: The blue dot highlights the minimum Cp metric, the model with 11 predictors has the lowest Cp and so this metric also identifies the model with 11 predictors as the most suitable one.
+4- BIC vs. Number of Variables: We should aim for a model with a low BIC, as the number of our variables increaes the BIC decreases and we observe the lowest BIC for the model with 11 predictors, in accordance with previous metrics.
+
+All in all the 4 metrics showed that the best model was the one with 11 predictors.
+
+### Extracting Coefficients
+
+We now display the coefficients of the forward subset model with 11 predictors.
+
+```{r pressure18, echo=FALSE}
+coef(subset.fwd ,11)
+```
+
+Similarly to best subset selection, sickle cell disease is the most significant predictor.
+
+## Backward Subset Selection
+
+We now perform backward subset selection which is a method that starts with a full model containing all predictor variables and iteratively removes the least significant variables one by one until no further imrpovements can be made.
+
+```{r pressure19, echo=FALSE}
+subset.bwd = regsubsets (Outcome~., data=df_unique ,nvmax = ncol(df_unique) - 1, method ="backward")
+summary ( subset.bwd )
+```
+
+### Visualizing Model Complexity Measures in Forward Subset Selection
+
+We now visualize various model complexity measures in backward subset selection.
+
+```{r pressure20, echo=FALSE}
+# plotting RSS
+par(mfrow=c(2,2))
+plot(summary(subset.bwd)$rss ,xlab="Number of Variables ",ylab="RSS",type="l")
+# Plotting adjusted R squared with red dot on max value
+plot(summary(subset.bwd)$adjr2 ,xlab="Number of Variables ", ylab="Adjusted RSq",type="l")
+points(which.max(summary(subset.bwd)$adjr2), summary(subset.bwd)$adjr2[11], col="purple", cex=
+2,pch=20)
+# Plotting CP with red dot on minimal value
+plot(summary(subset.bwd)$cp ,xlab="Number of Variables ",ylab="Cp", type='l')
+points(which.min(summary(subset.bwd)$cp),summary(subset.bwd)$cp [10],col="purple", cex=2,pch=20)
+# Plotting BIC
+plot(summary(subset.bwd)$bic ,xlab="Number of Variables ",ylab="BIC",type='l')
+```
+
+The four metrics highlighted the model with 11 predictors as the best one as well, which is in line with the prior results of the 2 previous methods.
+
+### Extracting Coefficients
+
+We now display the coefficients of the backward subset model with 11 predictors.
+
+```{r pressure21, echo=FALSE}
+coef(subset.bwd, 11)
+```
+
+Similarly to best and forward subset selections, sickle cell disease is the most significant predictor.
+
+Given that all three methods (best, forward, and backward subset selections) converged on the same set of predictors (11), this shows robust and consistent results, so we are confident that the best model is the one with these 11 predictors (excluding BMI from the total predictors).
+
+## 5-Resampling Techniques
+
+# Validation Set Approach
+
+The validation set approach was implemented for the logistic regression.
+The logistic regression model was built on a training set of 697 out of 997 observations using the 11 predictors that were predicted to be significant by model selection approaches like Age, Cardio_Vascular_Diseases, Hypertension, Diabetes, and other health conditions.
+The model's performance was then evaluated on the test set, which consisted of 300 observations.
+The accuracy of the model was calculated by comparing predicted values with the actual outcome values providing important insights into its predictive capabilities on unseen data.
+
+Some predictors like Age, Diabetes, Cardio_Vascular_Diseases showed statistical significance.
+
+The residual deviance (17.689) is less than the null deviance, which suggests a good fit and a low AIC (41.689) implies that the model is a good balance between being accurate and not too complex.
+It is important to note that this is just for the training set, thus we evaluated the performance on unseen data.
+
+Observations with probabilities above 0.5 were classified as "Outcome," while those below 0.5 were classified as "No Outcome." When comparing the predicted outcomes with actual outcomes in the test set, the model’s accuracy was around 64.98%.
+This indicates that the model correctly predicted the outcome for 65% of cases in the validation set.
+
+There is room for improvement and optimization.
+So, we will compare its performance to other classification methods like LDA and QDA.
+
+```{r pressure22, echo=FALSE}
+install.packages("ISLR")
+library(ISLR)
+```
+
+```{r pressure23, echo=FALSE}
+set.seed(1)
+dim(df_unique)
+train = sample(997,697) # training = 697 out of 997 observations
+# Running logistic regression on the training set
+df_unique$Outcome <- as.factor(df_unique$Outcome)
+glm.fit <- glm(Outcome ~ Age + Gender + Diabetes + Cardio_Vascular_Diseases + Sickle_cell_diesases + Immuno_deficiency_disease + Down_syndrome + Cancer + Chronic_Respiratory_disease + Hypertension + Vaccinated,
+data = df_unique, subset = train, family = binomial)
+summary(glm.fit)
+```
+
+```{r pressure24, echo=FALSE}
+glm.probs = predict(glm.fit, type ="response") # predicting class
+contrasts(df_unique$Outcome) # checking what dummy variable for each class of output
+#df_unique$Outcome <- factor(df_unique$Outcome, levels = c("No outcome", "Outcome"), labels = c("No Outcome", "Outcome"))
+```
+
+```{r pressure25, echo=FALSE}
+# Creating an initial vector of predictions (assuming "Outcome" means having a condition, like "Glaucoma")
+glm.pred = rep(0, 300)  # Set all to "No Outcome" initially
+
+# Update the prediction for observations with a probability greater than 0.5
+glm.pred[glm.probs > 0.5] = 1  # Correct predictions
+
+# Calculate the fraction of correct predictions
+mean(glm.pred == df_unique$Outcome, na.rm = TRUE)
+
+```
+
+```{r pressure26, echo=FALSE}
+install.packages("MASS")
+```
+
+# 6-Linear Discriminant Analysis (LDA)
+
+We applied LDA to the training set using the same selected predictors as above. The resulting LDA.fit summarizes the LDA model. We obtained predictions on the training set and calculated the fraction of correct predictions providing insights into the accuracy of the LDA model for the training set.
+
+The prior probabilities 0.81 for outcome = 0 and 0.19 for outcome = 1 indicate an unbalanced dataset where most observations belong to outcome = 0 class, this leads to bias towards that class. Predictors like sickle_cel_diseases and chronic-respiratory_disease have high coefficients meaning they are significant in the separation of the two classes. The accuracy of correct predictions is 0.971 which is very high. Moreover, the confusion matrix showed that outcome = 0 (no condition) was correctly classified 813 times with 23 false positives, while outcome = 1 (condition) was correctly classified 156 times with only 5 false positives. Thus, the model is highly accurate in distinguishing the two classes. The ROC curve generated is good since it is close to the top left corner, and the AUC is equal to 0.9963 which is very close to 1, which indicates very good predictive power. However, this might be due to the unbalanced dataset. 
+
+```{r pressure27, echo=FALSE}
+library (MASS)
+lda.fit = lda(Outcome ~ Age + Gender + Diabetes + Cardio_Vascular_Diseases + Sickle_cell_diesases + Immuno_deficiency_disease + Down_syndrome + Cancer + Chronic_Respiratory_disease + Hypertension + Vaccinated, data=df_unique, subset=train )
+lda.fit
+```
+
+```{r pressure28, echo=FALSE}
+lda.pred <- predict(lda.fit, newdata = df_unique)
+lda.class = lda.pred$class
+mean(lda.class == df_unique$Outcome) # fraction of correct predictions
+```
+
+```{r pressure29, echo=FALSE}
+install.packages("pROC")
+```
+
+```{r pressure30, echo=FALSE}
+library(pROC)
+# confusion matrix
+table(lda.class, df_unique$Outcome)
+```
+
+```{r pressure31, echo=FALSE}
+# ROC curve
+roc_lda <- roc(response = df_unique$Outcome, predictor = lda.pred$posterior[,2])
+```
+
+```{r pressure32, echo=FALSE}
+# Plot ROC curve
+plot(roc_lda, main = "ROC Curve for LDA Model", col = "blue", lwd = 2)
+```
+
+```{r pressure33, echo=FALSE}
+auc(roc_lda) # area under curve
+```
+
+# 7-Quadratic Discriminant Analysis (QDA)
+
+Since our data is imbalanced, we applied regularized QDA on the training set since QDA faces issues and might struggle on imbalanced data. Using regularized QDA helps to stabilize it when there are imbalanced groups.We chose gamma = 0.05 which will help reduce the influence of the majority class. The rda.fit summarizes the model. We used the same predictors as above and again, generated predictions for the entire dataset, calculated the fraction of correct predictions,assessed model performance using a confusion matrix and plotted the ROC curve along with the area under the curve calculation.
+
+As above, prior probabilities show that the data is imbalanced.The apparent misclassification rate of 13.94% indicates the error on the training data, so it is fitting well onto the data. The cross-validated misclassification rate of 14.07% shows the error rate after cross-validation, providing an estimate of how well the model performs on unseen data. Since the two values are close, then there is no overfitting. 
+Similar to the LDA results, the accuracy of correct predictions is 0.861 which is very high, however its slightly lower than the value we got for the LDA model. Moreover, the confusion matrix showed that outcome = 0 (no condition) was correctly classified 817 times with 138  false positives, while outcome = 1 (condition) was correctly classified 41 times with only 1 false positives. Thus, this model is also highly accurate in distinguishing the two classes. The ROC curve generated exhibited a similar trend as in LDA, meaning it is good since it is close to the top left corner. The AUC is equal to 0.9129 which is very close to 1, which indicates very good predictive power.
+
+```{r pressure34, echo=FALSE}
+install.packages("caret")
+library(klaR)
+rda.fit <- rda(Outcome ~ Age + Gender + Diabetes + Cardio_Vascular_Diseases + 
+               Sickle_cell_diesases + Immuno_deficiency_disease + Down_syndrome + 
+               Cancer + Chronic_Respiratory_disease + Hypertension + Vaccinated, 
+               data = df_unique, subset = train, gamma = 0.05)  # Adjust gamma for regularization
+
+rda.fit
+```
+
+```{r pressure35, echo=FALSE}
+rda.pred = predict(rda.fit , newdata = df_unique)
+ rda.class = rda.pred$class
+ mean(rda.class == df_unique$Outcome) 
+ 
+```
+
+```{r pressure36, echo=FALSE}
+library(pROC)
+# confusion matrix
+table(rda.class, df_unique$Outcome)
+```
+
+```{r pressure37, echo=FALSE}
+# ROC curve
+ roc_rda <- roc(response = df_unique$Outcome, predictor = rda.pred$posterior[,2])
+```
+
+```{r pressure38, echo=FALSE}
+ # Plot ROC curve
+ plot(roc_rda, main = "ROC Curve for RDA Model", col = "green", lwd = 2)
+```
+
+```{r pressure39, echo=FALSE}
+auc(roc_rda) # area under the curve
+```
