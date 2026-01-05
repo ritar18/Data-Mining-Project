@@ -1,0 +1,573 @@
+---
+title: "Your Title"
+output:
+  pdf_document: default
+  word_document: default
+always_allow_html: true
+---
+
+## Project Phase 3
+
+Mira Madi & Rita Rizkallah
+
+## 1-About Dataset
+
+This dataset can used to predict possibility or risk of getting other diseases.This includes the details of individuals having various disorders.Very useful for corona risk prediction.
+It has attributes like age, diabetes, cancer, etc.
+The dataset is from kaggle.
+Outcome: risk of getting another disease.
+(the possibility of comorbidities)
+
+## 2-Data Preprocessing
+
+Data preprocessing is important because it ensures that the data is clean and that we end up with the most accurate results possible.
+
+First, we set the working directory, read the dataset file and view it.
+
+```{r pressure, echo=FALSE}
+options(repos = c(CRAN = "https://cran.rstudio.com/"))
+install.packages("tinytex")
+setwd("C:/Users/MSI/OneDrive - Lebanese American University/Desktop/Data Mining")
+df <- read.csv("Diseases.csv")
+View(df)
+```
+
+Then, we invoked the str function which provides a summary of the dataset, including its type, the number of observations, and variables (attributes).
+It also gives the type of each attribute.
+
+We also invoked the summary function which gives the "5-number summary", for our data it is only relevant for the age and bmi attributes, since the rest are qualitative attributes
+
+colnames(df) prints out the names of the columns which represent the attributes.
+
+```{r pressure1, echo=FALSE}
+str(df)
+summary(df)
+colnames(df)
+```
+
+In order to check for missing values, we first invoke the dim function which gives the number of observations and the number of attributes, then invoke the na.omit function which removes missing values and then we recheck using dim function, the result did not change meaning that we don't have any missing values.
+This ensures that our data is complete!
+
+```{r pressure2, echo=FALSE}
+dim(df)
+df <- na.omit(df)
+dim(df)
+```
+
+If duplicates are present, it is always better if they are removed, as they can introduce correlated error terms, which lead to the prediction intervals being narrower than they should be.
+So we invoked duplicated function which showed that we had 2 rows that are duplicated, to remove them we used !d
+uplicated function and saved the result to a new dataframe.
+
+```{r pressure3, echo=FALSE}
+df[duplicated(df), ]
+```
+
+```{r pressure4, echo=FALSE}
+df_unique <- df[!duplicated(df), ]
+df_unique[duplicated(df_unique), ]
+View(df_unique)
+```
+
+We suspect that there is a correlation between a high BMI and an increased risk of diabetes, thus we created a subset of data taking BMI > 25, and this showed that our doubts might be correct.
+
+```{r pressure5, echo=FALSE}
+subset_BMI <- subset(df_unique, BMI > 25)
+View(subset_BMI)
+```
+
+To check if we have logical values of age and BMI we ran the function unique.
+It showed the possible values for age and BMI that are present in our data and it seems that they are all within the normal range of logical values, thus we do not have any unexpected random values.
+
+```{r pressure6, echo=FALSE}
+unique(df_unique$Age)
+unique(df_unique$BMI)
+```
+
+Our dataset is very imbalanced, with more samples labeled 0 (820) than labeled 1 (179). So, we have to make the data balanced in order to get accurate results. To address the class imbalance in the dataset, we oversampled the minority class by duplicating rows until it matched the size of the majority class. We then combined the two classes and shuffled the dataset to prevent introducing any patterns. This created a balanced dataset, helping reduce bias in machine learning models. However, oversampling can lead to overfitting, as the model might memorize duplicated data. 
+
+```{r pressure6, echo=FALSE}
+
+# Check the class imbalance
+table(df_unique$Outcome)
+
+# Separate majority and minority classes
+majority <- df_unique[df_unique$Outcome == 0, ]
+minority <- df_unique[df_unique$Outcome == 1, ]
+
+# Oversample the minority class by duplicating rows
+set.seed(123) # For reproducibility
+oversampled_minority <- minority[sample(1:nrow(minority), nrow(majority), replace = TRUE), ]
+
+# Combine the oversampled minority with the majority
+balanced_df <- rbind(majority, oversampled_minority)
+
+# Shuffle the data
+balanced_df <- balanced_df[sample(1:nrow(balanced_df)), ]
+
+# Check the new class distribution
+table(balanced_df$Outcome)
+
+# Save the balanced dataset
+write.csv(balanced_df, "Balanced_Diseases.csv", row.names = FALSE)
+cat("Balanced dataset saved to the current working directory as Balanced_Diseases.csv\n")
+
+
+
+
+
+
+```
+
+## 3-Data Visualization
+
+```{r pressure7, echo=FALSE}
+library(tidyverse)
+
+df_unique_long <- balanced_df %>%
+  pivot_longer(
+    cols = c(Diabetes, Cardio_Vascular_Diseases, Sickle_cell_diesases, Immuno_deficiency_disease, 
+             Down_syndrome, Cancer, Chronic_Respiratory_disease, Hypertension), 
+    names_to = "Condition", 
+    values_to = "Has_Condition"
+  )
+
+df_unique_long <- df_unique_long[df_unique_long$Has_Condition == 1, ]
+ggplot(df_unique_long, aes(x = Gender, fill = Condition)) +
+  geom_bar(position = "stack") +
+  labs(title = "Stacked Bar Graph of Chronic Conditions by Gender",
+       x = "Gender", y = "Count of Conditions") +
+  theme_minimal()
+```
+
+This stacked bar graph shows the different diseases' distributions between females and males.
+We see that there is a minor difference between females and males in general, as both have almost equal number of cases.
+
+```{r pressure8, echo=FALSE}
+ggplot(balanced_df, aes(x = Gender, fill = factor(Cardio_Vascular_Diseases))) +
+  geom_bar(position = "dodge") +
+  labs(
+    title = "Grouped Bar Chart of Cardiovascular Disease by Gender",
+    x = "Gender",
+    y = "Count",
+    fill = "Cardio Vascular Disease"
+  ) +
+  scale_fill_manual(values = c("0" = "lightgray", "1" = "steelblue"),
+                    labels = c("No", "Yes")) +
+  theme_minimal()
+```
+
+This grouped bar chart shows count of presence and absence of CVD for Females and Males.
+It shows that more males have CVD vs females, this does not seem to be significant but further analysis such as statistical test are needed.
+
+```{r pressure9, echo=FALSE}
+ggplot(balanced_df, aes(x = factor(Diabetes), y = BMI, fill = factor(Diabetes))) +
+  geom_boxplot(outlier.colour = "red", outlier.size = 2) +  # Optional: Highlight outliers
+  labs(
+    title = "Box Plot of BMI by Diabetes Status",
+    x = "Diabetes (0 = No, 1 = Yes)",
+    y = "BMI",
+    fill = "Diabetes"
+  ) +
+  scale_fill_manual(values = c("0" = "lightblue", "1" = "lightcoral")) +
+  theme_minimal()
+```
+
+This box plot shows the 5-number summary for Diabetes (present (1) or absent (0)) in function of BMI level.
+While the median BMI is slightly higher in individuals with diabetes, there is no significant difference in the overall distribution of BMI between the two groups.
+However, the presence of outliers suggests that some individuals with diabetes may have extreme BMI values.
+
+```{r pressure10, echo=FALSE}
+ggplot(data = balanced_df, aes(x = Vaccinated)) +
+  geom_histogram(fill = "magenta", color = "black", bins = 3) +
+  labs(x = "Vaccinated", y = "Frequency") +
+  scale_x_continuous(breaks = c(0, 1)) +
+  theme_minimal()
+```
+
+The bar chart shows the frequency of individuals who are vaccinated (1) and not vaccinated (0).
+The height of each bar represents the number of individuals in each category.
+From the chart, it appears that there are more individuals who are vaccinated than not vaccinated.
+
+```{r pressure11, echo=FALSE, fig.width=10, fig.height=8}
+library(psych)
+library(corrplot)
+
+# Convert Gender to numeric if not already done
+balanced_df$Gender <- as.numeric(factor(balanced_df$Gender))
+
+# Select only numeric columns for correlation
+numeric_df <- balanced_df[sapply(balanced_df, is.numeric)]
+
+# Perform correlation test
+correlations <- corr.test(numeric_df)
+
+# Extract correlation matrix
+corr_matrix <- correlations$r
+
+# Adjust the plot size and label angles
+corrplot(corr_matrix, 
+         method = "color", 
+         type = "upper", 
+         order = "hclust", 
+         tl.col = "black", 
+         tl.srt = 45,    # Rotate labels for readability
+         tl.cex = 0.8)   # Adjust text label size
+
+```
+
+This correlation matrix shows all possible correlations and the level of correlation ranging from -1 (dark red) to 1 (dark blue).
+There seems to be some kind of correlation between all the different types of diseases with the outcome, being the risk of getting another disease.
+For example, there seems to be little correlation between cardiovascular diseases and the risk of getting another disease, while others like down sydrome and chronic respiratory disease have a higher correlation with the outcome.
+BMI has no correlation with the outcome, but age and gender do have a somewhat low correlation with it.
+Moreover there seems to be a positive correlation between cancer and sickle cell diseases as well as between Down syndrome and and immuno dificiency disease.These can be used as interaction terms when we generate our model.
+The matrix also shows a negative correlation between diabetes and sickle cell diseases, as well as cancer.
+All in all, there is a need to generate multiple linear regression models, including interaction terms.
+
+# 4 - Tree Based Methods 
+
+To make it easier to develop and assess models, we separated the dataset into separate training and testing sets. Our approach involves training these models on the assigned training set and evaluating how well they perform on the test set.
+
+
+```{r pressure10, echo=FALSE}
+# Set the seed for reproducibility
+set.seed(1, sample.kind="Rejection")
+
+# Generate random indices for the training set (80% of the data)
+ind <- sample(1:nrow(balanced_df), 0.8 * nrow(balanced_df), replace = FALSE)
+
+# Create the training set
+train <- balanced_df[ind,]
+
+# Create the testing set (remaining 20% of the data)
+test <- balanced_df[-ind,]
+
+# Check the sizes of the resulting datasets
+cat("Training set size:", nrow(train), "\n")
+cat("Testing set size:", nrow(test), "\n")
+
+
+```
+We will now proceed with the decision tree model. 
+
+```{r pressure10, echo=FALSE}
+
+library(rpart)
+
+df1_tree = rpart(Outcome~., data=train, method="class") 
+summary(df1_tree)
+
+```
+The model's complexity parameter (CP) values indicate the level of tree pruning, with a reduction in error as the number of splits increases. The most influential variables in the model include chronic respiratory disease, vaccination status, hypertension, and age, which help predict the outcome with high accuracy. The tree's nodes indicate the distribution of the predicted outcomes (0 or 1) and the most important features for each split. For example, chronic respiratory disease is a strong predictor at the root node, leading to further splits based on factors such as age, gender, and other health conditions.
+
+```{r pressure10, echo=FALSE}
+plot(df1_tree) 
+text(df1_tree) 
+
+```
+```{r pressure10, echo=FALSE}
+#prediction on test data 
+df1_pred = predict(df1_tree, newdata=test, type="class") 
+conf.matrix <- table(df1_pred, test$Outcome) 
+conf.matrix
+
+```
+When the model was tested on the test set, the confusion matrix showed that it was accurate in predicting the outcome. It correctly identifies 161 positive outcomes (True Positives) and 145 negative outcomes (True Negatives). However, it makes 13 false positives and 9 false negatives, which are relatively low. Hence, the model performs fairly well. 
+
+
+
+```{r pressure10, echo=FALSE}
+
+
+library(pROC)
+
+p <- predict(df1_tree, newdata=test, type='prob') 
+roc <- roc(test$Outcome, p[,2]) 
+
+auc(roc) 
+
+plot(roc) 
+
+
+```
+As for the ROC curve, the graph is close to the top left corner, which means that our model performs well. Moreover, the area under the curve of 0.9675 (close to 1) shows that the model is highly effective in distinguishing between the classes. This suggests that the model has strong predictive performance and makes accurate predictions on unseen data.
+
+
+
+```{r pressure10, echo=FALSE}
+
+#Base Model 
+set.seed(123) 
+base_model <- rpart(Outcome~., data = train, method = "class", 
+control = rpart.control(cp = 0)) #With cp=0 it means the tree will be built to its depth  
+#Plot Decision Tree 
+plot(base_model) 
+
+```
+The decision tree plot shows the hierarchical structure of splits based on the features in the data. At the top is the root node, which contains all the data, and each subsequent node represents a split based on a feature that best separates the data according to a splitting criterion like the Gini index. The leaves are the predicted outcome for the subset of data they represent.
+
+
+```{r pressure10, echo=FALSE}
+
+printcp(base_model) 
+
+plotcp(base_model) 
+
+```
+
+The tree began with a root node error of 49.2%, representing the proportion of incorrect predictions in the absence of splits. As the model added splits, the relative error progressively decreased, indicating improved fit to the training data.
+The graph shows that as the CP decreases, the relative error decreases as well, indicating that smaller CP values allow for more splits, which results in a larger tree that better fits the training data. This trend reflects improved training accuracy, but very low CP values can lead to overfitting.
+
+
+```{r pressure10, echo=FALSE}
+test$pred <- predict(base_model, test, type = "class") 
+base_accuracy <- mean(test$pred == test$Outcome) 
+base_accuracy 
+```
+The accuracy of 0.9481707 shows that the model is very accurate.
+
+Pruning:
+
+We optimized the base model by pruning it with a carefully chosen complexity parameter to balance prediction accuracy and model simplicity. The goal is to select a cp value that ensures high accuracy while keeping the model interpretable. 
+
+
+```{r pressure10, echo=FALSE}
+model_pruned <- prune(base_model, cp = 0.0017) 
+plot(model_pruned) 
+text(model_pruned) 
+```
+
+
+
+```{r pressure10, echo=FALSE}
+test$pred <- predict(model_pruned, test, type = "class") 
+accuracy_prun <- mean(test$pred == test$Outcome) 
+accuracy_prun 
+
+```
+The identical accuracy of 0.9481707 for both the unpruned and pruned models indicates that pruning did not affect the model's predictive performance on the test dataset. This happens because the splits removed during pruning likely captured nuances specific to the training data that did not generalize to the test data. 
+
+
+Bagging: 
+
+```{r pressure10, echo=FALSE}
+library(randomForest) 
+set.seed(123) 
+diag_bag = randomForest(formula = as.factor(Outcome) ~ ., 
+data = train, 
+mtry = (ncol(train)-1), 
+importance = T, 
+ntree=1000) 
+diag_bag 
+
+```
+
+The random forest model achieved an OOB error rate of 1.76%. With 1000 trees and 12 variables considered at each split, the model demonstrates effective classification. The confusion matrix shows that class 0 (negative outcome) has a very low class error of 0.03, with 644 correct predictions and only 20 false positives. Class 1 (positive outcome) has a class error of 0.05, with 641 correct predictions and only 3 false negatives. Overall, the model performs well with minimal errors.
+
+
+Random Forest:
+
+```{r pressure10, echo=FALSE}
+
+diag_rf <- randomForest(formula=as.factor(Outcome)~.,  
+                        data=train,  
+                        mtry=sqrt(ncol(train)-1), 
+                        importance=T,  
+                        ntree=1000) 
+diag_rf
+
+varImpPlot(diag_rf) 
+
+
+```
+This model has a slightly higher OOB error rate (1.83%) compared to the first model but still performs very well. It has a very low class error for both classes, classifying most in the correct class. The model is still effective, with a reasonable trade-off between accuracy and simplicity. The plot shows the importance of variables in the random forest model, where the ones on the top are the most important. 
+
+```{r pressure10, echo=FALSE}
+diag_rf_pred <- predict(object=diag_rf, newdata=test, type="class") 
+ 
+table(test$Outcome, diag_rf_pred) 
+
+acc_rf <- mean(test$Outcome==diag_rf_pred) 
+acc_rf 
+
+```
+The random forest model achieved an accuracy of 98.78% on the test data, with very few misclassifications. The confusion matrix reveals that 150 instances of class 0 were correctly predicted as class 0, and 174 instances of class 1 were correctly predicted as class 1. The model made only 0 false negative predictions, while 4 false positives occurred. This indicates that the model performs very well on the test data.
+
+Boosting:
+
+Boosting works iteratively, where each new model focuses on correcting the errors of the previous ones. 
+
+```{r pressure10, echo=FALSE}
+
+library(gbm)
+
+set.seed(1)
+
+# Split data into training and testing sets
+ind <- sample(1:nrow(balanced_df), 0.8 * nrow(balanced_df), replace = FALSE)
+train2 <- balanced_df[ind, ]
+test2 <- balanced_df[-ind, ]
+
+# Encode Gender as numeric 
+train2$Gender <- ifelse(train2$Gender == "Male", 0, 1)
+test2$Gender <- ifelse(test2$Gender == "Male", 0, 1)
+
+
+# Train the boosting model
+boost.train <- gbm(Outcome ~ .,  
+                   data = train2,  
+                   distribution = "bernoulli",  
+                   n.trees = 1000,  
+                   interaction.depth = 4)
+
+# Make predictions on the test set
+p <- predict(boost.train, newdata = test2, n.trees = 1000)
+
+# Convert probabilities to binary class predictions
+predicted_classes <- ifelse(p > 0.5, 1, 0)
+
+confusion_matrix <- table(Predicted = predicted_classes, Actual = test2$Outcome)
+print(confusion_matrix)
+
+```
+The confusion matrix indicates that the model performed perfectly on the test data. It correctly predicted all 154 instances of class 0 and all 174 instances of class 1, resulting in no false positives or false negatives. This means the model achieved 100% accuracy which may indicate potential overfitting. 
+
+# 5 - Unsupervised Techniques
+
+PCA: 
+
+```{r pressure10, echo=FALSE}
+
+library(caret)
+library(dummy)
+
+numeric_cols <- sapply(balanced_df, is.numeric) 
+ 
+# Extract numeric data 
+numeric_data <- balanced_df[, numeric_cols] 
+ 
+# Standardize the numeric data 
+scaled_numeric_data <- scale(numeric_data) 
+ 
+# Perform PCA 
+pca_result_numeric <- prcomp(scaled_numeric_data) 
+ 
+# Display PCA results for numeric data 
+print(summary(pca_result_numeric)) 
+
+
+```
+
+The PCA results show that the first two principal components explain about 42% of the total variance, with PC1 alone capturing 23.83%. The first five components together explain around 70% of the variance, and all 12 components explain 100% of the variance. This suggests that a significant portion of the data's variability is captured by the first few components, and dimensionality can potentially be reduced by focusing on them without losing much information.
+
+```{r pressure10, echo=FALSE}
+
+biplot(pca_result_numeric, scale = 0) 
+```
+The biplot provides a visualization of how both the variables and observations relate to the principal components, helping to understand the structure of the data in reduced dimensions.The arrows represent the variables in the dataset, showing their contribution to the principal components. The points represent the observations (data points), plotted according to their scores on the principal components.
+
+```{r pressure10, echo=FALSE}
+#Viz of PCA 
+loadings <- pca_result_numeric$rotation 
+cor_matrix <- cor(loadings) 
+print(cor_matrix) 
+
+```
+The loadings indicate how much each original variable contributes to each principal component. The correlation matrix shows the pairwise correlations between the loadings of the different principal components. A high correlation indicates that two principal components are similar in how they combine the original variables.
+
+```{r pressure10, echo=FALSE}
+par(mar = c(5, 4, 2, 2))   
+heatmap(cor_matrix,  
+        col = colorRampPalette(c("blue", "white", "red"))(100),   
+        main = "Correlation Matrix Heatmap",  
+        margins = c(5, 5),  
+        cexRow = 0.8, cexCol = 0.8,   
+        key.title = NULL   
+) 
+legend("topright", legend = c("Low", "High"), fill = 
+colorRampPalette(c("blue", "white", "red"))(100), bty = "n", title = 
+"Correlation") 
+
+```
+```{r pressure10, echo=FALSE}
+
+par (mfrow=c(1,2)) 
+pve <- pca_result_numeric$sdev^2/sum(pca_result_numeric$sdev^2) 
+distances <- abs((length(pve):1) - pve) 
+elbow_point <- which.max(distances) 
+plot(pve, type = "o", ylab = "PVE", 
+xlab = "Principal Component", col = "blue", xlim = c(0, length(pve)+1), 
+pch=20) 
+points(elbow_point, pve[elbow_point], col = "pink", pch = 20, cex = 2) 
+#cumulative proportion of variance explained 
+plot(cumsum(pve), type = "o", ylab = "Cumulative PVE", 
+xlab = "Principal Component", col = "blue", xlim = c(0, length(pve)+1), 
+pch=20) 
+points(elbow_point, pve[elbow_point], col = "pink", pch = 20, cex = 2) 
+
+```
+The first plot shows how much variance each principal component explains individually. We can see that the first few components explain a large portion of the variance, and the explanation decreases as we progress through the graph. The elbow point (in pink) indicates the point where the rate of variance explained slows down significantly. So for us, we might stop using more components after 2 components, since they explain little additional variance. 
+The second plot shows the cumulative proportion of variance explained as more principal components are included. The elbow point again marks where additional components add less new information.
+
+```{r pressure10, echo=FALSE}
+screeplot(pca_result_numeric, type="l", main=NULL)
+
+```
+The scree plot helps visualize the relative importance of each principal component, and the "elbow" aids in selecting the number of components that should be kept for further analysis. In our case, the plot shows a sharp decline and then starts to decline progressively. This shows that  The plot shows that the first few components collectively account for a substantial portion of the dataset’s variability, aligning with the principle of capturing the most significant information with the fewest components. PC1 and PC2 emerge as particularly informative, explaining a significant majority of the overall variability in the data.
+
+Clustering:
+
+K-means Clustering:
+
+```{r pressure10, echo=FALSE}
+outcome_dataset<- matrix(rnorm(1000), ncol = 10) 
+outcome_dataset[sample(length(outcome_dataset), 10)] <- NaN 
+ 
+# Check for missing or extreme values 
+any(is.na(outcome_dataset))  # Check for missing values 
+
+any(is.infinite(outcome_dataset) | is.nan(glaucoma_dataset))  # Check for infinite or NaN values 
+ 
+# Even though we did a preprocessing step, we tried to reproduce a real life scenario, where missing and extreme values exist. if we don't handle these values, the k means will not work correctly. 
+
+# Handle missing or extreme values 
+outcome_dataset[is.na(outcome_dataset)] <- 0  # Replace NA with 0 
+outcome_dataset[is.infinite(outcome_dataset) | is.nan(outcome_dataset)] <- 0 # Replace Inf/NaN with 0 
+k <- 2 
+kmeans_result <- kmeans(outcome_dataset, centers = k) 
+cluster_assignments <- kmeans_result$cluster 
+print(cluster_assignments)
+```
+We obtained the k means clusters (where k=2, we have 2 clusters), and now we want to visualize the results of k-means 
+clustering by plotting the clusters along with their centroids. 
+
+```{r pressure10, echo=FALSE}
+
+plot(outcome_dataset[,1], outcome_dataset[,2], col = cluster_assignments, pch = 19, xlab = "1", ylab =  "2") 
+points(kmeans_result$centers[,1], kmeans_result$centers[,2], col = 1:k, pch = 8, cex = 3) 
+
+```
+Hierarchichal Clustering:
+
+```{r pressure10, echo=FALSE}
+set.seed(123) 
+# Compute hierarchical clustering 
+hc <- hclust(dist(balanced_df)) 
+
+hc.average = hclust(dist(balanced_df), method ="average")
+
+hc.single = hclust(dist(balanced_df), method ="single")
+
+# Plot the dendrogram 
+plot(hc, main = "Hierarchical Clustering Dendrogram - Complete") 
+plot(hc.average, main = "Hierarchical Clustering Dendrogram - Average") 
+plot(hc.single, main = "Hierarchical Clustering Dendrogram - Single") 
+
+```
+
+```{r pressure10, echo=FALSE}
+
+# Cluster labels for each observation associated with a given cut k 
+cutree(hc.average, 3) # k=3 
+
+```
+We applied hierarchical clustering to the dataset, which is an unsupervised machine learning technique used to group similar data points based on their distance or dissimilarity. We performed hierarchical clustering with different linkage methods: complete linkage, average linkage, and single linkage. Each method differs in how it calculates the distance between clusters as they are merged. We then visualized the clustering results by plotting dendrograms which show how observations are merged at different distance levels. Finally, we assigned cluster labels to the observations, cutting the dendrogram at k=3 to create three clusters. 
