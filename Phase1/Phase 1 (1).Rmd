@@ -1,0 +1,584 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+## Project Phase 1
+
+Mira Madi & Rita Rizkallah
+
+## 1-About Dataset
+(copy paste from Kaggle)
+
+The "Student Performance Prediction Dataset" is a valuable resource for anyone interested in understanding and improving student academic performance. Its rich collection of features enables the development of predictive models and the exploration of factors that contribute to student success. By harnessing the insights from this dataset, educators and policymakers can work towards enhancing the educational experience and outcomes of students.
+
+It is a comprehensive collection of data designed to facilitate predictive analysis related to student academic performance. This dataset is invaluable for educators, researchers, and data scientists seeking to gain insights into factors that influence student success. It can be used to build predictive models and identify key indicators that affect student performance, ultimately helping institutions and individuals make informed decisions to improve educational outcomes.
+
+Description of Attributes in the "Student Performance Prediction Dataset":
+
+STUDENT ID: A unique identifier assigned to each student in the dataset, enabling individual tracking and analysis.
+
+Student_Age: The age of the student at the time of data collection, providing insight into the age distribution of the student population.
+
+Sex: The gender of the student, typically categorized as male or female, which can be used for gender-based analysis of academic performance.
+
+Graduated High-School Type: Describes the type of high school from which the student graduated, such as public, private, or specialized institutions. This attribute can help assess the influence of high-school background on student performance.
+
+Scholarship Type: Indicates whether the student received any scholarships or financial aid for their education, which can be relevant for assessing the impact of financial support on academic outcomes.
+
+Additional Work: Represents whether the student is involved in any additional work or part-time employment alongside their studies, which may impact study hours and overall performance.
+
+Sports Activity: Indicates whether the student participates in sports activities, which can provide insights into the relationship between physical activities and academic performance.
+
+Transportation: Describes the mode of transportation used by the student to commute to school, which may have implications for punctuality and attendance.
+
+Weekly Study Hours: The number of hours per week that the student dedicates to studying, reflecting their study habits and potential commitment to academics.
+
+Attendance: Reflects the student's attendance record, which can be an essential factor in determining their engagement and participation in classes.
+
+Reading: Represents the student's performance or scores in reading-related subjects or assessments.
+
+Notes: Reflects the student's performance or scores in note-taking-related subjects or assessments.
+
+Listening in Class: Represents the student's performance or scores in class listening-related subjects or assessments.
+
+Project Work: Indicates whether the student is involved in project work or assignments, which can be a significant component of their overall grade.
+
+Grade: The final grade or academic performance measure for each student, which serves as the predictive target for analysis. This is often the attribute of interest for building predictive models.
+
+These attributes collectively provide a holistic view of each student's academic and personal profile, making the dataset suitable for various analyses, including predictive modeling, identifying influential factors, and assessing the impact of different variables on student performance. Researchers and educators can leverage this dataset to gain insights into the complex interplay of factors that contribute to students' academic success or challenges.
+
+## 2-Data Preprocessing
+
+Data preprocessing is important because it ensures that the data is clean and that we end up with the most accurate results possible.
+
+First, we set the working directory, read the dataset file and view it.
+
+```{r, echo=TRUE, results='markup'}
+setwd("C:/Users/MSI/OneDrive - Lebanese American University/Desktop/Data Mining")
+df0 <- read.csv("Students.csv")
+View(df0)
+```
+
+Then, we invoked the str function which provides a summary of the dataset, including its type, the number of observations, and variables (attributes). It also gives the type of each attribute.
+
+We also invoked the summary function which gives the "5-number summary", for our quantitative data being the age, weekly-study hours, and grade(response), since the rest are qualitative attributes
+
+colnames(df) prints out the names of the columns which represent the attributes.
+
+```{r, echo=TRUE, results='markup'}
+str(df0)
+summary(df0)
+colnames(df0)
+```
+This showed the Scholarship attribute as chr, which not really the case given it should be a quantitative variable. Thus, we converted it to numerical format. Now we can the 5-number summary for scholarship as well. 
+
+```{r, echo=TRUE, results='markup'}
+df1 <- df0
+df1$Scholarship <- as.numeric(gsub("%", "", df1$Scholarship))
+str(df1)
+summary(df1)
+View(df1)
+```
+
+In order to check for missing values, we first invoke the dim function which gives the number of observations and the number of attributes, then invoke the na.omit function which removes missing values and then we recheck using dim function, the result did not change meaning that we don't have any missing values. This ensures that our data is complete!
+
+```{r, echo=TRUE, results='markup'}
+dim(df1)
+df <- na.omit(df1)
+dim(df1)
+```
+
+If duplicates are present, it is always better if they are removed, as they can introduce correlated error terms, which lead to the prediction intervals being narrower than they should be. So we invoked duplicated function which showed that we had no duplicates.
+
+```{r, echo=TRUE, results='markup'}
+df1[duplicated(df1), ]
+```
+
+We suspect that there is a correlation between additional work and high grades, thus we created a subset of data taking those who do additional work, and this showed that our doubts might be correct given that most of the grades were above 9.
+
+```{r, echo=TRUE, results='markup'}
+subset_work <- subset(df1, A6itional_Work == "Yes")
+View(subset_work)
+```
+
+To check if we have logical values of our attributes, we ran the function unique. It showed the possible values for each of these attributes that are present in our data and it seems that they are all within the normal range of logical values except for 1% for the scholarship, 3 for attendance, and 6 for listening in class and notes respecively. To avoid any illogical results, we removed the student observations with these values and the issue was resolved.
+
+```{r, echo=TRUE, results='markup'}
+unique(df$Student_Age)
+unique(df$Grade)
+unique(df$Weekly_Study_Hours)
+unique(df$Scholarship)
+unique(df$Attendance)
+unique(df$Project_work)
+unique(df$Listening_in_Class)
+unique(df$Notes)
+unique(df$Reading)
+unique(df$Transportation)
+unique(df$Sports_activity)
+unique(df$A6itional_Work)
+unique(df$High_School_Type)
+unique(df$Sex)
+```
+```{r pressure, echo=FALSE}
+
+df2 <- df1
+
+df2 <- df2[df2$Scholarship != 1 & 
+            df2$Listening_in_Class != "6" & 
+            df2$Notes != "6" & 
+            df2$Attendance != "3", ]
+
+unique(df2$Scholarship)
+unique(df2$Listening_in_Class)
+unique(df2$Notes)
+unique(df2$Attendance)
+
+```
+
+## 3-Data Visualization
+
+
+```{r, echo=TRUE, results='markup'}
+# Bar plot for High School Type
+library(ggplot2)
+ggplot(df2, aes(x = High_School_Type)) +
+  geom_bar(fill = "steelblue") +
+  theme_minimal() +
+  labs(title = "Count of Students by High School Type",
+       x = "High School Type", y = "Number of Students")
+```
+
+This stacked bar graph shows the different diseases' distributions between females and males. We see that there is a minor difference between females and males in general, as both have almost equal number of cases.
+
+```{r, echo=TRUE, results='markup'}
+# Boxplot for Scholarship vs. Grade
+ggplot(df2, aes(x = factor(Scholarship), y = Grade)) +
+  geom_boxplot(fill = "coral", color = "black") +
+  theme_light() +
+  labs(title = "Grade Distribution by Scholarship Percentage",
+       x = "Scholarship Percentage", y = "Grade")
+```
+
+This grouped bar chart shows count of presence and absence of CVD for Females and Males. It shows that more males have CVD vs females, this does not seem to be significant but further analysis such as statistical test are needed.
+
+```{r, echo=TRUE, results='markup'}
+# Histogram of Weekly Study Hours
+ggplot(df2, aes(x = Weekly_Study_Hours)) +
+  geom_histogram(binwidth = 1, fill = "magenta", color = "black") +
+  theme_minimal() +
+  labs(title = "Distribution of Weekly Study Hours",
+       x = "Weekly Study Hours", y = "Count of Students")
+```
+
+This box plot shows the 5-number summary for Diabetes (present (1) or absent (0)) in function of BMI level. While the median BMI is slightly higher in individuals with diabetes, there is no significant difference in the overall distribution of BMI between the two groups. However, the presence of outliers suggests that some individuals with diabetes may have extreme BMI values.
+
+```{r, echo=TRUE, results='markup'}
+# Violin plot of Study Hours by Sex
+ggplot(df2, aes(x = Sex, y = Weekly_Study_Hours, fill = Sex)) +
+  geom_violin() +
+  theme_minimal() +
+  labs(title = "Distribution of Study Hours by Sex",
+       x = "Sex", y = "Weekly Study Hours")
+```
+
+The bar chart shows the frequency of individuals who are vaccinated (1) and not vaccinated (0). The height of each bar represents the number of individuals in each category. From the chart, it appears that there are more individuals who are vaccinated than not vaccinated.
+
+```{r, echo=TRUE, results='markup'}
+# Heatmap for Attendance vs. Scholarship
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+
+# Step 1: Aggregate the data to count occurrences
+attendance_scholarship_counts <- df2 %>%
+  group_by(Attendance, Scholarship) %>%
+  summarize(Count = n(), .groups = "drop")
+
+# Step 2: Create the heatmap with pre-computed counts
+ggplot(attendance_scholarship_counts, aes(x = Attendance, y = factor(Scholarship), fill = Count)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient(low = "lightblue", high = "darkblue") +
+  theme_minimal() +
+  labs(title = "Heatmap of Attendance by Scholarship Percentage",
+       x = "Attendance", y = "Scholarship Percentage", fill = "Count")
+```
+
+
+## 4-Simple Linear Regression
+
+1)  Age vs Outcome
+
+```{r, echo=TRUE, results='markup'}
+ggplot(data = df2) +
+  geom_point(mapping = aes(x = Weekly_Study_Hours, y = Grade)) + 
+  geom_smooth(mapping = aes(x = Weekly_Study_Hours, y = Grade), 
+              method = "lm", se = FALSE, color = "blue") +
+  labs(title = "Linear Regression: Study Hours vs Grade",
+       x = "Weekly Study Hours", y = "Grade")
+(hours <- summary(lm(`Grade`~`Weekly_Study_Hours`,df2)))
+```
+2) 
+
+```{r, echo=TRUE, results='markup'}
+ggplot(data = df2) +
+  geom_point(mapping = aes(x = Scholarship, y = Grade)) + 
+  geom_smooth(mapping = aes(x = Scholarship, y = Grade), 
+              method = "lm", se = FALSE, color = "blue") +
+  labs(title = "Linear Regression: Study Hours vs Grade",
+       x = "Weekly Study Hours", y = "Grade")
+(scholarship <- summary(lm(`Grade`~`Scholarship`,df2)))
+```
+
+
+```{r, echo=TRUE, results='markup'}
+# Ensure A6itional_Work is treated as a factor (categorical variable)
+df2$A6itional_Work <- as.factor(df2$A6itional_Work)
+
+# Fit the linear regression model
+model <- lm(Grade ~ A6itional_Work, data = df2)
+
+# Print the summary of the model
+summary(model)
+```
+
+
+```{r, echo=TRUE, results='markup'}
+# Ensure A6itional_Work is treated as a factor
+df2$A6itional_Work <- as.factor(df2$A6itional_Work)
+
+# Create the boxplot
+ggplot(data = df2, aes(x = A6itional_Work, y = Grade)) +
+  geom_boxplot(fill = c("lightblue", "lightgreen")) +
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 3, color = "red") +
+  labs(title = "Grade Distribution by A6itional Work",
+       x = "A6itional Work", y = "Grade") +
+  theme_minimal()
+```
+```{r pressure, echo=FALSE}
+# Ensure A6itional_Work is treated as a factor (categorical variable)
+df2$Attendance <- as.factor(df2$Attendance )
+
+# Fit the linear regression model
+model <- lm(Grade ~ Attendance , data = df2)
+
+# Print the summary of the model
+summary(model)
+```
+
+
+```{r, echo=TRUE, results='markup'}
+# Ensure Attendance is treated as a factor
+df2$Attendance <- as.factor(df2$Attendance)
+
+# Create the boxplot
+ggplot(data = df2, aes(x = Attendance, y = Grade)) +
+  geom_boxplot(fill = c("lightblue", "lightgreen", "lightcoral")) +  # Add a third color for "Never"
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 3, color = "red") +
+  labs(title = "Grade Distribution by Attendance",
+       x = "Attendance", y = "Grade") +
+  theme_minimal()
+```
+
+
+```{r, echo=TRUE, results='markup'}
+# Ensure A6itional_Work is treated as a factor (categorical variable)
+df2$Sports_activity <- as.factor(df2$Sports_activity)
+
+# Fit the linear regression model
+model3 <- lm(Grade ~ Sports_activity, data = df2)
+
+# Print the summary of the model
+summary(model3)
+```
+```{r pressure, echo=FALSE}
+df2$Sports_activity <- as.factor(df2$Sports_activity)
+
+ggplot(data = df2, aes(x = Sports_activity, y = Grade)) +
+  geom_boxplot(aes(fill = Sports_activity)) +
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 3, color = "red") +
+  labs(title = "Grade Distribution by Sports Activity",
+       x = "Sports Activity", y = "Grade") +
+  theme_minimal()
+```
+
+```{r, echo=TRUE, results='markup'}
+# Ensure A6itional_Work is treated as a factor (categorical variable)
+df2$A6itional_Work <- as.factor(df2$A6itional_Work)
+
+# Fit the linear regression model
+model <- lm(Grade ~ A6itional_Work, data = df2)
+
+# Print the summary of the model
+summary(model)
+```
+```{r pressure, echo=FALSE}
+df2$A6itional_Work <- as.factor(df2$A6itional_Work)
+
+ggplot(data = df2, aes(x = A6itional_Work, y = Grade)) +
+  geom_boxplot(aes(fill = A6itional_Work)) +
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 3, color = "red") +
+  labs(title = "Grade Distribution by A6itional Work",
+       x = "A6itional Work", y = "Grade") +
+  theme_minimal()
+```
+
+```{r, echo=TRUE, results='markup'}
+# Ensure Notes is treated as a factor (categorical variable)
+df2$Notes <- as.factor(df2$Notes)
+
+# Fit the linear regression model
+model4 <- lm(Grade ~ Notes, data = df2)
+
+# Print the summary of the model
+summary(model4)
+```
+
+```{r, echo=TRUE, results='markup'}
+df2$Notes <- as.factor(df2$Notes)
+
+ggplot(data = df2, aes(x = Notes, y = Grade)) +
+  geom_boxplot(aes(fill = Notes)) +
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 3, color = "red") +
+  labs(title = "Grade Distribution by Notes",
+       x = "Notes", y = "Grade") +
+  theme_minimal()
+```
+
+
+```{r, echo=TRUE, results='markup'}
+# Ensure Reading is treated as a factor (categorical variable)
+df2$Reading <- as.factor(df2$Reading)
+
+# Fit the linear regression model
+model5 <- lm(Grade ~ Reading, data = df2)
+
+# Print the summary of the model
+summary(model5)
+```
+
+
+```{r, echo=TRUE, results='markup'}
+df2$Reading <- as.factor(df2$Reading)
+
+ggplot(data = df2, aes(x = Reading, y = Grade)) +
+  geom_boxplot(aes(fill = Reading)) +  # Use the fill aesthetic directly from the data
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 3, color = "red") +
+  labs(title = "Grade Distribution by Reading",
+       x = "Reading", y = "Grade") +
+  theme_minimal()
+```
+
+```{r, echo=TRUE, results='markup'}
+df2$Listening_in_Class <- as.factor(df2$Listening_in_Class)
+
+model6 <- lm(Grade ~ Listening_in_Class, data = df2)
+
+summary(model6)
+```
+
+```{r, echo=TRUE, results='markup'}
+df2$Listening_in_Class <- as.factor(df2$Listening_in_Class)
+
+ggplot(data = df2, aes(x = Listening_in_Class, y = Grade)) +
+  geom_boxplot(aes(fill = Listening_in_Class) ) +
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 3, color = "red") +
+  labs(title = "Grade Distribution by Listening in Class",
+       x = "Listening in Class", y = "Grade") +
+  theme_minimal()
+```
+
+```{r, echo=TRUE, results='markup'}
+df2$Project_work <- as.factor(df2$Project_work)
+
+model7 <- lm(Grade ~ Project_work, data = df2)
+
+summary(model7)
+```
+```{r pressure, echo=FALSE}
+df2$Project_work <- as.factor(df2$Project_work)
+
+ggplot(data = df2, aes(x = Project_work, y = Grade)) +
+  geom_boxplot(fill = c("lightblue", "lightgreen")) +
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 3, color = "red") +
+  labs(title = "Grade Distribution by Project Work",
+       x = "Project Work", y = "Grade") +
+  theme_minimal()
+```
+
+## 5- Multiple Linear Regression
+
+First, we generate a model including the "weekly study hours" and the "reading" predictors, since they are important to include in our model as R^2 was high for each of their simple linear regression models. We can see that the R^2 for this model is 0.7, which is good since a greater proportion of variance is explained. Both predictors  are significant and positively influence grades. 
+
+```{r, echo=TRUE, results='markup'}
+
+library(ggplot2)
+
+
+df2$Reading_Binary <- ifelse(df2$Reading == "Yes", 1, 0)
+
+
+model <- lm(Grade ~ Weekly_Study_Hours + Reading_Binary, data = df2)
+
+
+summary(model)
+
+
+ggplot(df2, aes(x = Weekly_Study_Hours, y = Grade)) +
+  geom_point(aes(color = as.factor(Reading_Binary))) +
+  geom_smooth(method = "lm", se = FALSE, color = "blue") +
+  labs(title = "Multiple Linear Regression: Study Hours and Reading vs Grade",
+       x = "Weekly Study Hours", y = "Grade", color = "Reading (Binary)") +
+  theme_minimal()
+
+
+
+```
+
+
+Since listening in class also has an effect on grades, as it can also be seen through the simple linear model, we now include it in the model. 
+
+From the summary, we see that the estimate of reading and weekly study hours coefficients decreased slightly, which is reasonable since logically, when someone listens in class, it contributes highly to getting higher grades.The inclusion of this predictor strengthened the model as RSE decreased and R^2 increased, even if slightly.
+
+```{r, echo=TRUE, results='markup'}
+
+
+library(ggplot2)
+
+df2$Reading_Binary <- ifelse(df2$Reading == "Yes", 1, 0)
+df2$Listening_Binary <- ifelse(df2$Listening_in_Class == "Yes", 1, 0)
+
+model <- lm(Grade ~ Weekly_Study_Hours + Reading_Binary + Listening_Binary, data = df2)
+
+summary(model)
+
+ggplot(df2, aes(x = Weekly_Study_Hours, y = Grade)) +
+  geom_point(aes(color = as.factor(Reading_Binary))) +
+  geom_smooth(method = "lm", se = FALSE, color = "blue") +
+  labs(title = "Multiple Linear Regression: Study Hours, Reading, Listening vs Grade",
+       x = "Weekly Study Hours", y = "Grade", color = "Reading (Binary)") +
+  theme_minimal()
+
+              
+```
+
+We will now create a polynomial regression model. Comparing the previous model with this one, the slightly lower RSE and higher R^2 values show that the polynomial model fits the data slightly better, which shows that there is a non-linear effect between study hours and grade. However, even though the polynomial model fits better, the linear model still works well and the improvement is not significant, so we will continue working with it.
+
+```{r, echo=TRUE, results='markup'}
+
+
+library(ggplot2)
+
+
+df2$Reading_Binary <- ifelse(df2$Reading == "Yes", 1, 0)
+df2$Listening_Binary <- ifelse(df2$Listening_in_Class == "Yes", 1, 0)
+
+
+poly_model <- lm(Grade ~ poly(Weekly_Study_Hours, 2) + Reading_Binary + Listening_Binary, data = df2)
+
+
+summary(poly_model)
+
+
+ggplot(df2, aes(x = Weekly_Study_Hours, y = Grade)) +
+  geom_point(aes(color = as.factor(Reading_Binary))) +
+  geom_smooth(method = "lm", formula = y ~ poly(x, 2), se = FALSE, color = "blue") +
+  labs(title = "Polynomial Regression: Study Hours vs Grade",
+       x = "Weekly Study Hours", y = "Grade", color = "Reading (Binary)") +
+  theme_minimal()
+
+
+
+
+```
+
+
+
+
+We now generate the same model, adding interaction terms. We can see that we have interactions between each 2 predictors: study hours alone aren’t enough as their positive effect is enhanced when combined with reading or listening. However, the highest correlation is between reading and listening, as the estimate of reading and listening is the hightest (0.5) and the p-value is 0.016 (very low), which shows that students who read and listen have a synergistic positive effect on grades. We also observe that there is no interaction between the three predictors altogether, as the estimate is -0.03. 
+However, the RSE did decrease slightly and the R^2 increased a little as well.
+
+```{r, echo=TRUE, results='markup'}
+
+library(ggplot2)
+
+df2$Reading_Binary <- ifelse(df2$Reading == "Yes", 1, 0)
+df2$Listening_Binary <- ifelse(df2$Listening_in_Class == "Yes", 1, 0)
+
+
+model_interaction <- lm(Grade ~ Weekly_Study_Hours * Reading_Binary * Listening_Binary, data = df2)
+
+
+summary(model_interaction)
+
+ggplot(df2, aes(x = Weekly_Study_Hours, y = Grade, color = as.factor(Listening_Binary))) +
+  geom_point(aes(shape = as.factor(Reading_Binary))) +
+  geom_smooth(method = "lm", se = FALSE, aes(group = interaction(Reading_Binary, Listening_Binary))) +
+  labs(title = "Multiple Linear Regression with Interaction: Study Hours, Reading, Listening vs Grade",
+       x = "Weekly Study Hours", y = "Grade", color = "Listening (Binary)", shape = "Reading (Binary)") +
+  theme_minimal()
+```
+
+We then added another predictor that we assume would also enhance our model because of the results of the simple linear model, and indeed, the R^2 increased to 0.7529 and the RSE decreased to 0.5826.
+
+```{r, echo=TRUE, results='markup'}
+
+library(ggplot2)
+
+df2$Reading_Binary <- ifelse(df2$Reading == "Yes", 1, 0)
+df2$Listening_Binary <- ifelse(df2$Listening_in_Class == "Yes", 1, 0)
+df2$Project_Work_Binary <- ifelse(df2$Project_work == "Yes", 1, 0)
+
+
+model_interaction_project <- lm(Grade ~ Weekly_Study_Hours * Reading_Binary * Listening_Binary + Project_Work_Binary, data = df2)
+
+
+summary(model_interaction_project)
+
+
+ggplot(df2, aes(x = Weekly_Study_Hours, y = Grade, color = as.factor(Listening_Binary))) +
+  geom_point(aes(shape = as.factor(Reading_Binary))) +
+  geom_smooth(method = "lm", se = FALSE, aes(group = interaction(Reading_Binary, Listening_Binary))) +
+  labs(title = "Multiple Linear Regression with Interaction: Study Hours, Reading, Listening, and Project Work vs Grade",
+       x = "Weekly Study Hours", y = "Grade", color = "Listening (Binary)", shape = "Reading (Binary)") +
+  theme_minimal()
+
+
+```
+
+Once we added the attendance predictor to the model, the R^2 decreased and so it is better to remove it and keep the previous predictors only. 
+
+```{r, echo=TRUE, results='markup'}
+
+
+library(ggplot2)
+
+
+df2$Reading_Binary <- ifelse(df2$Reading == "Yes", 1, 0)
+df2$Listening_Binary <- ifelse(df2$Listening_in_Class == "Yes", 1, 0)
+df2$Project_Work_Binary <- ifelse(df2$Project_Work == "Yes", 1, 0)
+
+
+df2$Attendance_Factor <- factor(df2$Attendance, levels = c("Never", "Sometimes", "Always"))
+
+
+model_interaction_project_attendance <- lm(Grade ~ Weekly_Study_Hours * Reading_Binary * Listening_Binary + 
+                                           Project_Work_Binary + Attendance_Factor, data = df2)
+
+
+summary(model_interaction_project_attendance)
+
+
+ggplot(df2, aes(x = Weekly_Study_Hours, y = Grade, color = as.factor(Listening_Binary))) +
+  geom_point(aes(shape = as.factor(Reading_Binary))) +
+  geom_smooth(method = "lm", se = FALSE, aes(group = interaction(Reading_Binary, Listening_Binary))) +
+  labs(title = "Multiple Linear Regression with Interaction: Study Hours, Reading, Listening, Project Work, and Attendance vs Grade",
+       x = "Weekly Study Hours", y = "Grade", color = "Listening (Binary)", shape = "Reading (Binary)") +
+  theme_minimal()
+
+
+
+```
+
+So our final model contains the following predictors: study hours, listening, reading and project work. Our overall model was able to explain 75% of the variability in the data (R^2), and the RSE was relatively low (0.5), which shows that our model is fairly reliable and accurate.
+
